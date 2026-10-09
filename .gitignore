@@ -1,0 +1,13 @@
+build/
+cmake-build-*/
+__pycache__/
+*.so
+*.pyc
+.venv/
+checkpoints/
+runs/
+*.pt
+*.onnx
+data/
+.DS_Store
+compile_commands.json
