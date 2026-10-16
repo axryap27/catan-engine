@@ -1,6 +1,6 @@
 # catan-engine
 
-A fast C++ engine for 4-player Settlers of Catan, built to train a game-playing AI through self-play with PPO (reinforcement learning).
+A fast C++ engine for 4-player Settlers of Catan, built to train a game-playing AI through self-play with PPO (reinforcement learning) and MCTS.
 
 ## Architecture
 
@@ -25,4 +25,4 @@ Early development. Only `core` foundations exist so far (board topology, board g
 ## Docs
 
 - `DESIGN.MD`: system design and diagrams
-- `OVERVIEW.MD`: prior work (Settlers-RL) and what we borrow or change
+- `OVERVIEW.MD`: prior work (Settlers-RL) and what we borrow or change from the implementation
