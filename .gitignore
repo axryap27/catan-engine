@@ -11,3 +11,4 @@ runs/
 data/
 .DS_Store
 compile_commands.json
+STATUS.md
