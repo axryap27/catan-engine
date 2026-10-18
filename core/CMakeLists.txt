@@ -2,6 +2,9 @@ add_library(catan_core
     src/topology.cpp
     src/board.cpp
     src/state.cpp
+    src/mask.cpp
+    src/chance.cpp
+    src/rules.cpp
 )
 
 target_include_directories(catan_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

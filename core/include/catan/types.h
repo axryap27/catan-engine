@@ -21,7 +21,7 @@ enum class DevCard  : uint8_t { KNIGHT, VICTORY_POINT, ROAD_BUILDING, YEAR_OF_PL
 
 enum class Phase : uint8_t {
     SETUP, ROLL, DISCARD, MOVE_ROBBER, STEAL, MAIN,
-    ROAD_BUILDING, YOP_PICK, EXCHANGE_RECV, TERMINAL
+    ROAD_BUILDING, YOP_PICK, MONOPOLY_PICK, EXCHANGE_RECV, TERMINAL
 };
 
 // 72-bit edge set: bit e lives in word e / 64, bit e % 64.

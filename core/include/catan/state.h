@@ -75,7 +75,7 @@ struct PublicState {
     uint8_t trades_this_turn;
     std::array<int8_t, NUM_RES> open_offer;
 
-    uint8_t reserved_[1]{};  // explicit padding to a multiple of 8
+    uint8_t pending_chance;  // ChanceKind awaiting apply_chance, 0 (NONE) if none
 };
 
 // Information only the owning player (or the deck) knows.
@@ -94,7 +94,7 @@ struct GameState {
 };
 
 // Layout: PublicState = 64 (roads) + 4 (ply, turn) + 54 + 5 + 6*4 + 12 + 4 + 9
-// + 2 + 5 + 1 reserved = 184. HiddenState = 20 + 20 + 5 + 5 + 6 reserved = 56.
+// + 2 + 5 + 1 (pending_chance) = 184. HiddenState = 20 + 20 + 5 + 5 + 6 reserved = 56.
 static_assert(sizeof(PublicState) == 184);
 static_assert(sizeof(HiddenState) == 56);
 static_assert(sizeof(GameState) == 240);
