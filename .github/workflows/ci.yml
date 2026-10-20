@@ -1,0 +1,35 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, cxx: g++-14, preset: debug }
+          - { os: ubuntu-24.04, cxx: g++-14, preset: asan }
+          - { os: ubuntu-24.04, cxx: clang++-18, preset: debug }
+          - { os: ubuntu-24.04, cxx: clang++-18, preset: asan }
+          - { os: macos-15, cxx: clang++, preset: debug }
+          - { os: macos-15, cxx: clang++, preset: asan }
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / ${{ matrix.cxx }} / ${{ matrix.preset }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}

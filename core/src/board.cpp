@@ -89,8 +89,8 @@ Board standard_board() {
         5, 6, 11,
     };
 
-    // TODO(verify): the harbor assignment below is a plausible reconstruction of the official
-    // beginner setup, not checked against the rulebook. Slots run clockwise from the top-left.
+    // Rulebook "Starting Map for Beginners" (5th ed., Illustration A). Slots run clockwise
+    // from the top-left.
     board.port_type = {
         ANY,                 // slot 0: hex 0 NW
         PortType::GRAIN,     // slot 1: hex 1 NE
@@ -98,9 +98,9 @@ Board standard_board() {
         ANY,                 // slot 3: hex 11 E
         PortType::WOOL,      // slot 4: hex 15 SE
         ANY,                 // slot 5: hex 17 SE
-        PortType::LUMBER,    // slot 6: hex 16 SW
+        ANY,                 // slot 6: hex 16 SW
         PortType::BRICK,     // slot 7: hex 12 W
-        ANY,                 // slot 8: hex 3 W
+        PortType::LUMBER,    // slot 8: hex 3 W
     };
 
     finalize(board);

@@ -8,5 +8,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(CATAN_CHECKED "Enable checked assertions and extra validation" OFF)
+option(CATAN_BUILD_TESTS "Build unit tests" ON)
 
 add_subdirectory(core)
+
+if(CATAN_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(core/tests)
+endif()
