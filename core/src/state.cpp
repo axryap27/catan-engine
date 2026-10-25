@@ -19,6 +19,7 @@ GameState initial_state(uint8_t robber_hex) {
     p.largest_army_holder = NONE;
     p.exchange_give = NONE;
     p.trade_target = NONE;
+    p.steal_victim = NONE;
 
     s.hid.dev_deck = DEV_DECK_COUNTS;
     return s;

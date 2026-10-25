@@ -5,6 +5,9 @@ add_library(catan_core
     src/mask.cpp
     src/chance.cpp
     src/rules.cpp
+    src/setup.cpp
+    src/turn.cpp
+    src/robber.cpp
 )
 
 target_include_directories(catan_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

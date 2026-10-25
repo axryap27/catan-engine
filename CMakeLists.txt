@@ -11,6 +11,7 @@ option(CATAN_CHECKED "Enable checked assertions and extra validation" OFF)
 option(CATAN_BUILD_TESTS "Build unit tests" ON)
 
 add_subdirectory(core)
+add_subdirectory(tools)
 
 if(CATAN_BUILD_TESTS)
     enable_testing()

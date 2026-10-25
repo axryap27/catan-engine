@@ -76,6 +76,9 @@ struct PublicState {
     std::array<int8_t, NUM_RES> open_offer;
 
     uint8_t pending_chance;  // ChanceKind awaiting apply_chance, 0 (NONE) if none
+    uint8_t steal_victim;    // seat being robbed while a STEAL chance is pending, else NONE
+
+    uint8_t reserved_[7]{};  // explicit padding to a multiple of 8
 };
 
 // Information only the owning player (or the deck) knows.
@@ -94,10 +97,10 @@ struct GameState {
 };
 
 // Layout: PublicState = 64 (roads) + 4 (ply, turn) + 54 + 5 + 6*4 + 12 + 4 + 9
-// + 2 + 5 + 1 (pending_chance) = 184. HiddenState = 20 + 20 + 5 + 5 + 6 reserved = 56.
-static_assert(sizeof(PublicState) == 184);
+// + 2 + 5 + 2 (pending_chance, steal_victim) + 7 reserved = 192. HiddenState = 20 + 20 + 5 + 5 + 6 reserved = 56.
+static_assert(sizeof(PublicState) == 192);
 static_assert(sizeof(HiddenState) == 56);
-static_assert(sizeof(GameState) == 240);
+static_assert(sizeof(GameState) == 248);
 static_assert(sizeof(GameState) <= 512);
 static_assert(std::is_trivially_copyable_v<PublicState>);
 static_assert(std::is_trivially_copyable_v<HiddenState>);

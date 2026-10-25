@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 
 #include "catan/action.h"
@@ -18,6 +19,16 @@
 namespace catan {
 
 inline constexpr int VICTORY_POINTS_TO_WIN = 10;
+inline constexpr int DISCARD_THRESHOLD = 7;  // a 7 makes hands larger than this discard half
+// The game ends with no winner once `turn` reaches this. Placeholder until scoring of capped
+// games is decided (STATUS.md, open decisions).
+inline constexpr uint16_t TURN_CAP = 1000;
+
+// Build costs, indexed by Resource (brick, lumber, wool, grain, ore).
+inline constexpr std::array<uint8_t, NUM_RES> ROAD_COST = {1, 1, 0, 0, 0};
+inline constexpr std::array<uint8_t, NUM_RES> SETTLEMENT_COST = {1, 1, 1, 1, 0};
+inline constexpr std::array<uint8_t, NUM_RES> CITY_COST = {0, 0, 0, 2, 3};
+inline constexpr std::array<uint8_t, NUM_RES> DEV_CARD_COST = {0, 0, 1, 1, 1};
 inline constexpr int SETUP_STEPS = 16;  // 8 placements (snake order), settlement then road each
 
 // Seat placing at setup step 0..15: 0 1 2 3 3 2 1 0, two steps per placement.
