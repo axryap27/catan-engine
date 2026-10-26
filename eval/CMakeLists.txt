@@ -1,0 +1,5 @@
+add_library(catan_eval src/random_policy.cpp src/greedy.cpp src/match.cpp)
+target_include_directories(catan_eval PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(catan_eval PUBLIC catan::core)
+target_compile_options(catan_eval PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_library(catan::eval ALIAS catan_eval)
