@@ -1,0 +1,5 @@
+add_library(catan_belief src/belief.cpp)
+target_include_directories(catan_belief PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(catan_belief PUBLIC catan::core)
+target_compile_options(catan_belief PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_library(catan::belief ALIAS catan_belief)

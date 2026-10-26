@@ -6,7 +6,7 @@ namespace catan {
 // Game state never holds RNG state; drivers derive every random outcome from
 // (seed, stream, index), so games replay exactly.
 
-enum class Stream : uint64_t { BOARD = 1, DICE = 2, DEV_DRAW = 3, STEAL = 4 };
+enum class Stream : uint64_t { BOARD = 1, DICE = 2, DEV_DRAW = 3, STEAL = 4, RESAMPLE = 5 };
 
 // Standard splitmix64 finalizer.
 constexpr uint64_t splitmix64(uint64_t x) {

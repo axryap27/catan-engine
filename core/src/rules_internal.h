@@ -114,6 +114,9 @@ void apply_setup(const Board& board, GameState& s, Action action, EventList& eve
 // Edges p may build a road on (cost aside): free edges touching p's building, or touching an
 // unoccupied vertex that one of p's roads reaches.
 EdgeSet buildable_roads(const PublicState& pub, uint8_t p);
+// Bank trade rate per resource for p: 4:1, 3:1 with a generic harbor, 2:1 with that resource's.
+std::array<uint8_t, NUM_RES> exchange_rates(const Board& board, const PublicState& pub,
+                                            uint8_t p);
 Decision roll_decision(const GameState& s);
 void apply_roll(GameState& s, Action action, EventList& events);     // sets pending DICE
 ChanceDist dice_dist();

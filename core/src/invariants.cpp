@@ -207,6 +207,13 @@ const char* invariant_violation(const Board& board, const GameState& state) {
     if (const char* why = check_board(pub)) return why;
     if (const char* why = check_awards(pub)) return why;
     if (pub.phase == Phase::TERMINAL) return nullptr;
+    if (pub.phase == Phase::EXCHANGE_RECV) {
+        const uint8_t p = pub.current_player;
+        const uint8_t give = pub.exchange_give;
+        if (state.hid.hands[p][give] < detail::exchange_rates(board, pub, p)[give]) {
+            return "exchange_give unaffordable";
+        }
+    }
     return check_liveness(board, state);
 }
 

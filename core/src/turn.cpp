@@ -12,23 +12,6 @@ bool touches(const EdgeSet& a, const EdgeSet& b) {
     return ((a[0] & b[0]) | (a[1] & b[1])) != 0;
 }
 
-// Bank trade rate per resource for p: 4:1, 3:1 with a generic harbor, 2:1 with that resource's.
-array<uint8_t, NUM_RES> exchange_rates(const Board& board, const PublicState& pub, uint8_t p) {
-    array<uint8_t, NUM_RES> rate;
-    rate.fill(4);
-    bool generic = false;
-    for (int v = 0; v < NUM_VERTICES; ++v) {
-        const uint8_t port = board.vertex_port[v];
-        if (port == NONE || vertex_owner(pub.vertex[v]) != p) continue;
-        if (port == static_cast<uint8_t>(PortType::GENERIC)) generic = true;
-        else rate[port] = 2;
-    }
-    if (generic) {
-        for (uint8_t& r : rate) r = min<uint8_t>(r, 3);
-    }
-    return rate;
-}
-
 // Pays out a non-7 roll. Demand is totalled first so a short bank is judged per resource.
 void produce(const Board& board, GameState& s, EventList& events) {
     const PublicState& pub = s.pub;
@@ -76,6 +59,9 @@ void end_turn(GameState& s, EventList& events) {
     PublicState& pub = s.pub;
     events.push(event(EventType::TURN_ENDED, pub.current_player, 0));
     pub.turn = static_cast<uint16_t>(pub.turn + 1);
+    pub.played_dev_this_turn = 0;
+    pub.trades_this_turn = 0;
+    s.hid.dev_bought_this_turn.fill(0);
     if (pub.turn >= TURN_CAP) {
         pub.phase = Phase::TERMINAL;
         events.push(event(EventType::GAME_OVER, NONE, 0));
@@ -84,12 +70,25 @@ void end_turn(GameState& s, EventList& events) {
     pub.current_player = static_cast<uint8_t>((pub.current_player + 1) % NUM_PLAYERS);
     pub.phase = Phase::ROLL;
     pub.dice = 0;  // resume_phase reads 0 as "not rolled yet"
-    pub.played_dev_this_turn = 0;
-    pub.trades_this_turn = 0;
-    s.hid.dev_bought_this_turn.fill(0);
 }
 
 }  // namespace
+
+array<uint8_t, NUM_RES> exchange_rates(const Board& board, const PublicState& pub, uint8_t p) {
+    array<uint8_t, NUM_RES> rate;
+    rate.fill(4);
+    bool generic = false;
+    for (int v = 0; v < NUM_VERTICES; ++v) {
+        const uint8_t port = board.vertex_port[v];
+        if (port == NONE || vertex_owner(pub.vertex[v]) != p) continue;
+        if (port == static_cast<uint8_t>(PortType::GENERIC)) generic = true;
+        else rate[port] = 2;
+    }
+    if (generic) {
+        for (uint8_t& r : rate) r = min<uint8_t>(r, 3);
+    }
+    return rate;
+}
 
 EdgeSet buildable_roads(const PublicState& pub, uint8_t p) {
     // An opponent's building on a vertex cuts p's network there.
