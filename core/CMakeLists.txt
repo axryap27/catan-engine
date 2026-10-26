@@ -8,6 +8,8 @@ add_library(catan_core
     src/setup.cpp
     src/turn.cpp
     src/robber.cpp
+    src/devcards.cpp
+    src/awards.cpp
 )
 
 target_include_directories(catan_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

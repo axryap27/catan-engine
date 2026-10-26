@@ -92,7 +92,7 @@ void apply_move_robber([[maybe_unused]] const Board& board, GameState& s, Action
     PublicState& pub = s.pub;
     pub.robber_hex = action.arg;
     events.push(event(EventType::ROBBER_MOVED, pub.current_player, action.arg));
-    pub.phase = victims(pub, pub.current_player) == 0 ? after_robber(pub) : Phase::STEAL;
+    pub.phase = victims(pub, pub.current_player) == 0 ? resume_phase(pub) : Phase::STEAL;
 }
 
 Decision steal_decision([[maybe_unused]] const Board& board, const GameState& s) {
@@ -140,7 +140,7 @@ void apply_steal_outcome(GameState& s, uint8_t outcome, EventList& events) {
     ++pub.hand_size[thief];
     events.push(event(EventType::STEAL, thief, r, 1, victim));
     pub.steal_victim = NONE;
-    pub.phase = after_robber(pub);
+    pub.phase = resume_phase(pub);
 }
 
 }  // namespace catan::detail

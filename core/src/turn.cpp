@@ -83,7 +83,7 @@ void end_turn(GameState& s, EventList& events) {
     }
     pub.current_player = static_cast<uint8_t>((pub.current_player + 1) % NUM_PLAYERS);
     pub.phase = Phase::ROLL;
-    pub.dice = 0;  // after_robber reads 0 as "not rolled yet"
+    pub.dice = 0;  // resume_phase reads 0 as "not rolled yet"
     pub.played_dev_this_turn = 0;
     pub.trades_this_turn = 0;
     s.hid.dev_bought_this_turn.fill(0);
@@ -91,13 +91,36 @@ void end_turn(GameState& s, EventList& events) {
 
 }  // namespace
 
+EdgeSet buildable_roads(const PublicState& pub, uint8_t p) {
+    // An opponent's building on a vertex cuts p's network there.
+    const Topology& topo = topology();
+    EdgeSet reach{};
+    for (int v = 0; v < NUM_VERTICES; ++v) {
+        const EdgeSet& inc = topo.vertex_edge_mask[v];
+        const uint8_t owner = vertex_owner(pub.vertex[v]);
+        if (owner == p || (owner == NONE && touches(inc, pub.roads[p]))) {
+            reach[0] |= inc[0];
+            reach[1] |= inc[1];
+        }
+    }
+    const EdgeSet taken = all_roads(pub);
+    return {reach[0] & ~taken[0], reach[1] & ~taken[1]};
+}
+
 Decision roll_decision(const GameState& s) {
     Decision d = player_decision(s.pub.current_player, Phase::ROLL);
-    set_type(d.mask, ActionType::ROLL);  // PR5 adds playing a Knight before the roll
+    set_type(d.mask, ActionType::ROLL);
+    // A development card may be played before rolling (usually a Knight).
+    d.mask.devcard = playable_dev_cards(s);
+    if (d.mask.devcard != 0) set_type(d.mask, ActionType::PLAY_DEV);
     return finish(d);
 }
 
-void apply_roll(GameState& s, Action, EventList&) {
+void apply_roll(GameState& s, Action action, EventList& events) {
+    if (action.type == ActionType::PLAY_DEV) {
+        apply_play_dev(s, action.arg, events);
+        return;
+    }
     // DICE_ROLLED is emitted by apply_dice once the outcome arrives.
     s.pub.pending_chance = static_cast<uint8_t>(ChanceKind::DICE);
 }
@@ -131,26 +154,15 @@ Decision main_decision(const Board& board, const GameState& s) {
     Decision d = player_decision(p, Phase::MAIN);
     set_type(d.mask, ActionType::END_TURN);
 
-    // One pass: p's settlements, vertices p's roads reach, and edges p's network extends to.
-    // An opponent's building on a vertex cuts the network there.
     VertexSet own_settlements = 0, road_touched = 0;
-    EdgeSet reach{};
     for (int v = 0; v < NUM_VERTICES; ++v) {
-        const EdgeSet& inc = topo.vertex_edge_mask[v];
-        const bool touched = touches(inc, roads);
-        if (touched) road_touched |= vertex_bit(v);
-        const uint8_t owner = vertex_owner(pub.vertex[v]);
+        if (touches(topo.vertex_edge_mask[v], roads)) road_touched |= vertex_bit(v);
         if (pub.vertex[v] == make_settlement(p)) own_settlements |= vertex_bit(v);
-        if (owner == p || (owner == NONE && touched)) {
-            reach[0] |= inc[0];
-            reach[1] |= inc[1];
-        }
     }
 
     const auto& pieces = pub.pieces_left[p];
     if (can_afford(s, p, ROAD_COST) && pieces[PIECE_ROAD] > 0) {
-        const EdgeSet taken = all_roads(pub);
-        d.mask.edge = {reach[0] & ~taken[0], reach[1] & ~taken[1]};
+        d.mask.edge = buildable_roads(pub, p);
         if ((d.mask.edge[0] | d.mask.edge[1]) != 0) set_type(d.mask, ActionType::BUILD_ROAD);
     }
     if (can_afford(s, p, SETTLEMENT_COST) && pieces[PIECE_SETTLEMENT] > 0) {
@@ -161,7 +173,11 @@ Decision main_decision(const Board& board, const GameState& s) {
         d.mask.city = own_settlements;
         if (d.mask.city != 0) set_type(d.mask, ActionType::BUILD_CITY);
     }
-    // BUY_DEV and PLAY_DEV: PR5.
+    if (can_afford(s, p, DEV_CARD_COST) && pub.dev_deck_remaining > 0) {
+        set_type(d.mask, ActionType::BUY_DEV);
+    }
+    d.mask.devcard = playable_dev_cards(s);
+    if (d.mask.devcard != 0) set_type(d.mask, ActionType::PLAY_DEV);
 
     uint8_t bank_has = 0;
     for (int r = 0; r < NUM_RES; ++r) {
@@ -187,7 +203,7 @@ void apply_main(const Board&, GameState& s, Action action, EventList& events) {
             edge_set_add(pub.roads[p], arg);
             --pub.pieces_left[p][PIECE_ROAD];
             events.push(event(EventType::ROAD_BUILT, p, arg));
-            // Longest road is maintained from PR6.
+            update_longest_road(s, events);
             break;
         case ActionType::BUILD_SETTLEMENT:
             pay(s, p, SETTLEMENT_COST, events);
@@ -195,6 +211,7 @@ void apply_main(const Board&, GameState& s, Action action, EventList& events) {
             --pub.pieces_left[p][PIECE_SETTLEMENT];
             ++pub.public_vp[p];
             events.push(event(EventType::SETTLEMENT_BUILT, p, arg));
+            update_longest_road(s, events);  // a settlement can cut an opponent's road
             break;
         case ActionType::BUILD_CITY:
             pay(s, p, CITY_COST, events);
@@ -209,6 +226,8 @@ void apply_main(const Board&, GameState& s, Action action, EventList& events) {
             pub.exchange_give = arg;
             pub.phase = Phase::EXCHANGE_RECV;
             break;
+        case ActionType::BUY_DEV: apply_buy_dev(s, events); break;
+        case ActionType::PLAY_DEV: apply_play_dev(s, arg, events); break;
         case ActionType::END_TURN: end_turn(s, events); break;
         default: CATAN_CHECK(false);
     }

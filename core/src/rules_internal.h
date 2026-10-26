@@ -16,6 +16,8 @@
 //   setup.cpp   SETUP
 //   turn.cpp    ROLL, dice, production, MAIN, EXCHANGE_RECV, END_TURN, victory
 //   robber.cpp  DISCARD, MOVE_ROBBER, STEAL and the steal chance
+//   devcards.cpp  BUY_DEV, PLAY_DEV, ROAD_BUILDING, YOP_PICK, MONOPOLY_PICK, dev draw chance
+//   awards.cpp  road length, Longest Road, Largest Army
 
 namespace catan::detail {
 
@@ -98,9 +100,9 @@ inline void pay(GameState& s, uint8_t p, const std::array<uint8_t, NUM_RES>& cos
     }
 }
 
-// Phase where play resumes after the robber: before the roll if a Knight was played before
-// rolling (dice is 0 until the roll), otherwise the main phase.
-inline Phase after_robber(const PublicState& pub) {
+// Phase where play resumes after the robber or a development card's sub-phase: ROLL if the
+// card was played before rolling (dice is 0 until the roll), otherwise MAIN.
+inline Phase resume_phase(const PublicState& pub) {
     return pub.dice == 0 ? Phase::ROLL : Phase::MAIN;
 }
 
@@ -109,6 +111,9 @@ Decision setup_decision(const PublicState& pub);
 void apply_setup(const Board& board, GameState& s, Action action, EventList& events);
 
 // turn.cpp
+// Edges p may build a road on (cost aside): free edges touching p's building, or touching an
+// unoccupied vertex that one of p's roads reaches.
+EdgeSet buildable_roads(const PublicState& pub, uint8_t p);
 Decision roll_decision(const GameState& s);
 void apply_roll(GameState& s, Action action, EventList& events);     // sets pending DICE
 ChanceDist dice_dist();
@@ -131,5 +136,30 @@ Decision steal_decision(const Board& board, const GameState& s);
 void apply_steal(GameState& s, Action action, EventList& events);  // sets pending STEAL
 ChanceDist steal_dist(const GameState& s);
 void apply_steal_outcome(GameState& s, uint8_t outcome, EventList& events);
+
+// devcards.cpp
+// Cards the current player may play now, as a bitmask over DevCard: at most one card per turn,
+// never VICTORY_POINT, never a card bought this turn, and only if the card can take effect.
+uint8_t playable_dev_cards(const GameState& s);
+void apply_buy_dev(GameState& s, EventList& events);  // pays, sets pending DEV_DRAW
+ChanceDist dev_draw_dist(const GameState& s);
+void apply_dev_draw(GameState& s, uint8_t outcome, EventList& events);
+void apply_play_dev(GameState& s, uint8_t card, EventList& events);
+Decision road_building_decision(const GameState& s);
+void apply_road_building(GameState& s, Action action, EventList& events);
+Decision yop_decision(const GameState& s);
+void apply_yop(GameState& s, Action action, EventList& events);
+Decision monopoly_decision(const GameState& s);
+void apply_monopoly(GameState& s, Action action, EventList& events);
+
+// awards.cpp
+// Longest simple road (each edge used once) of player p. A path may end at, but not pass
+// through, a vertex holding another player's building.
+uint8_t road_length(const PublicState& pub, uint8_t p);
+// Recomputes every road_len and moves the Longest Road card (and its 2 VP) per the rules.
+// Call after any road or settlement is placed.
+void update_longest_road(GameState& s, EventList& events);
+// Moves the Largest Army card (and its 2 VP) after a Knight is played.
+void update_largest_army(GameState& s, EventList& events);
 
 }  // namespace catan::detail

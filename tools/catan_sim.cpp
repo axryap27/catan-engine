@@ -15,6 +15,8 @@ using namespace catan;
 namespace {
 
 const char* const RES[] = {"brick", "lumber", "wool", "grain", "ore"};
+const char* const DEV[] = {"knight", "victory point", "road building", "year of plenty",
+                           "monopoly"};
 
 void print(const Event& e) {
     const int p = e.player;
@@ -28,6 +30,16 @@ void print(const Event& e) {
         case EventType::DICE_ROLLED: printf("P%d rolls %d\n", p, e.a); break;
         case EventType::ROBBER_MOVED: printf("  P%d moves the robber to hex %d\n", p, e.a); break;
         case EventType::STEAL: printf("  P%d steals %s from P%d\n", p, RES[e.a], e.target); break;
+        case EventType::DEV_BOUGHT: printf("  P%d buys a %s card\n", p, DEV[e.a]); break;
+        case EventType::DEV_PLAYED: printf("  P%d plays %s\n", p, DEV[e.a]); break;
+        case EventType::MONOPOLY:
+            if (e.b > 0) printf("  P%d takes %d %s from P%d\n", p, e.b, RES[e.a], e.target);
+            break;
+        case EventType::LONGEST_ROAD:
+            if (p == NONE) printf("  Longest Road is now unclaimed\n");
+            else printf("  P%d takes Longest Road\n", p);
+            break;
+        case EventType::LARGEST_ARMY: printf("  P%d takes Largest Army\n", p); break;
         case EventType::GAME_OVER:
             if (e.player == NONE) printf("Game over: turn cap reached\n");
             else printf("Game over: P%d wins\n", p);

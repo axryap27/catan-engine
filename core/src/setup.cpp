@@ -73,7 +73,7 @@ void apply_setup(const Board& board, GameState& s, Action action, EventList& eve
         edge_set_add(pub.roads[p], e);
         --pub.pieces_left[p][PIECE_ROAD];
         events.push(event(EventType::ROAD_BUILT, p, e));
-        // road_len is maintained from PR6.
+        update_longest_road(s, events);  // keeps road_len current; nobody reaches 5 in setup
     }
 
     ++pub.setup_step;

@@ -26,8 +26,8 @@ Decision chance_decision(const GameState& s) {
     switch (kind) {
         case ChanceKind::DICE: d.chance = dice_dist(); return d;
         case ChanceKind::STEAL: d.chance = steal_dist(s); return d;
-        case ChanceKind::NONE:
-        case ChanceKind::DEV_DRAW: unimplemented(kind);  // DEV_DRAW: PR5
+        case ChanceKind::DEV_DRAW: d.chance = dev_draw_dist(s); return d;
+        case ChanceKind::NONE: unimplemented(kind);
     }
     unimplemented(kind);
 }
@@ -46,15 +46,15 @@ Decision next_decision(const Board& board, const GameState& state) {
         case Phase::DISCARD: return discard_decision(state);
         case Phase::MOVE_ROBBER: return move_robber_decision(state);
         case Phase::STEAL: return steal_decision(board, state);
+        case Phase::ROAD_BUILDING: return road_building_decision(state);
+        case Phase::YOP_PICK: return yop_decision(state);
+        case Phase::MONOPOLY_PICK: return monopoly_decision(state);
         case Phase::TERMINAL: {
             Decision d{};
             d.kind = DecisionKind::TERMINAL;
             d.phase = Phase::TERMINAL;
             return d;
         }
-        case Phase::ROAD_BUILDING:
-        case Phase::YOP_PICK:
-        case Phase::MONOPOLY_PICK: unimplemented(pub.phase);  // PR5
     }
     unimplemented(pub.phase);
 }
@@ -72,9 +72,9 @@ EventList apply(const Board& board, GameState& state, Action action) {
         case Phase::DISCARD: apply_discard(state, action, events); break;
         case Phase::MOVE_ROBBER: apply_move_robber(board, state, action, events); break;
         case Phase::STEAL: apply_steal(state, action, events); break;
-        case Phase::ROAD_BUILDING:
-        case Phase::YOP_PICK:
-        case Phase::MONOPOLY_PICK:
+        case Phase::ROAD_BUILDING: apply_road_building(state, action, events); break;
+        case Phase::YOP_PICK: apply_yop(state, action, events); break;
+        case Phase::MONOPOLY_PICK: apply_monopoly(state, action, events); break;
         case Phase::TERMINAL: unimplemented(state.pub.phase);  // TERMINAL has no actions
     }
     if (state.pub.phase != Phase::SETUP) check_victory(state, events);
@@ -93,8 +93,8 @@ EventList apply_chance(const Board& board, GameState& state, uint8_t outcome) {
     switch (kind) {
         case ChanceKind::DICE: apply_dice(board, state, outcome, events); break;
         case ChanceKind::STEAL: apply_steal_outcome(state, outcome, events); break;
-        case ChanceKind::NONE:
-        case ChanceKind::DEV_DRAW: unimplemented(kind);  // DEV_DRAW: PR5
+        case ChanceKind::DEV_DRAW: apply_dev_draw(state, outcome, events); break;
+        case ChanceKind::NONE: unimplemented(kind);
     }
     check_victory(state, events);
     state.pub.ply = static_cast<uint16_t>(state.pub.ply + 1);
