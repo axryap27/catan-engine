@@ -33,3 +33,21 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
         run: ctest --preset ${{ matrix.preset }}
+
+  # 10k random games in the checked build: invariants after every step, masks vs the
+  # reference legality check on every decision, replay determinism.
+  fuzz:
+    runs-on: ubuntu-24.04
+    name: fuzz / clang++-18 / checked
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake --preset checked -DCMAKE_CXX_COMPILER=clang++-18
+      - name: Build
+        run: cmake --build --preset checked --target test_fuzz
+      - name: Fuzz
+        env:
+          CATAN_FUZZ_GAMES: "10000"
+        run: build/checked/core/tests/test_fuzz

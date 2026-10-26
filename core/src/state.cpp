@@ -1,5 +1,7 @@
 #include "catan/state.h"
 
+#include <cstring>
+
 namespace catan {
 
 GameState initial_state(uint8_t robber_hex) {
@@ -23,6 +25,17 @@ GameState initial_state(uint8_t robber_hex) {
 
     s.hid.dev_deck = DEV_DECK_COUNTS;
     return s;
+}
+
+uint64_t state_hash(const GameState& state) {
+    unsigned char bytes[sizeof(GameState)];
+    std::memcpy(bytes, &state, sizeof bytes);
+    uint64_t h = 0xCBF29CE484222325;
+    for (unsigned char b : bytes) {
+        h ^= b;
+        h *= 0x100000001B3;
+    }
+    return h;
 }
 
 }  // namespace catan

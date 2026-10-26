@@ -112,4 +112,8 @@ static_assert(std::has_unique_object_representations_v<GameState>);
 // Fresh game at the start of setup; robber_hex is the desert hex.
 GameState initial_state(uint8_t robber_hex);
 
+// 64-bit FNV-1a over the state's bytes (no padding, so equal states hash equal). Golden replays
+// pin these values; any rules change that alters play changes them.
+uint64_t state_hash(const GameState& state);
+
 }  // namespace catan

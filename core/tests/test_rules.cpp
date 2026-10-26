@@ -319,6 +319,7 @@ TEST_CASE("rules: second-round road mask covers only the new settlement, minus t
     // setup road are distance-blocked), so inject it.
     const uint8_t taken_edge = topo.vertex_edges[w][0];
     edge_set_add(s.pub.roads[0], taken_edge);
+    --s.pub.pieces_left[0][PIECE_ROAD];  // keep piece counts consistent for the checked build
 
     apply(b, s, {ActionType::BUILD_SETTLEMENT, w});
     const Decision dr = next_decision(b, s);

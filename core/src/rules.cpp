@@ -1,5 +1,6 @@
 #include "catan/rules.h"
 
+#include "catan/invariants.h"
 #include "catan/mask.h"
 #include "rules_internal.h"
 
@@ -16,6 +17,16 @@ namespace {
 }
 [[noreturn]] void unimplemented(ChanceKind kind) {
     detail::unimplemented("chance kind", static_cast<int>(kind));
+}
+
+// Checked build only: abort with the violated invariant after every transition.
+void check_state([[maybe_unused]] const Board& board, [[maybe_unused]] const GameState& s) {
+#if CATAN_CHECKED
+    if (const char* why = invariant_violation(board, s)) {
+        std::fprintf(stderr, "catan: invariant violated at ply %d: %s\n", s.pub.ply, why);
+        std::abort();
+    }
+#endif
 }
 
 Decision chance_decision(const GameState& s) {
@@ -79,6 +90,7 @@ EventList apply(const Board& board, GameState& state, Action action) {
     }
     if (state.pub.phase != Phase::SETUP) check_victory(state, events);
     state.pub.ply = static_cast<uint16_t>(state.pub.ply + 1);
+    check_state(board, state);
     return events;
 }
 
@@ -98,6 +110,7 @@ EventList apply_chance(const Board& board, GameState& state, uint8_t outcome) {
     }
     check_victory(state, events);
     state.pub.ply = static_cast<uint16_t>(state.pub.ply + 1);
+    check_state(board, state);
     return events;
 }
 

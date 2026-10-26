@@ -265,6 +265,9 @@ void check_victory(GameState& s, EventList& events) {
     const uint8_t p = pub.current_player;
     const int vp = pub.public_vp[p] + s.hid.dev_held[p][idx(DevCard::VICTORY_POINT)];
     if (vp < VICTORY_POINTS_TO_WIN) return;
+    // A win can land mid sub-phase (the first free road takes Longest Road); drop what's owed.
+    pub.free_roads = 0;
+    pub.yop_remaining = 0;
     pub.phase = Phase::TERMINAL;
     events.push(event(EventType::GAME_OVER, p, 0));
 }
