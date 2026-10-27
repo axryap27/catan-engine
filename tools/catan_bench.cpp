@@ -308,6 +308,7 @@ int main(int argc, char** argv) {
 
     auto [r, wall] = run_games(o, o.threads, clock.overhead);
 
+    //printed statements vibecoded:
     printf("policy %s, %d thread%s, %d games from seed %llu\n", policy, o.threads,
            o.threads == 1 ? "" : "s", o.games, static_cast<unsigned long long>(o.first_seed));
     printf("decisions %llu (player %llu), turns %llu, %.1f turns/game, capped %d\n",
