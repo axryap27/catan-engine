@@ -1,6 +1,6 @@
 # catan-engine
 
-A fast C++20 engine for 4-player Settlers of Catan, built to train a game-playing AI through self-play with PPO (reinforcement learning) and MCTS.
+A fast C++20 engine for 4-player Settlers of Catan, built to train a game-playing AI through self-play with PPO (reinforcement learning) and (maybe?!) MCTS.
 
 Player-to-player trading is turned off for now; bank and port trades work normally.
 
@@ -15,7 +15,7 @@ Apple M3 Pro (6 performance + 6 efficiency cores), Release build:
 | Scaling, 4 threads | 3.88x | 3.76x |
 | Decision latency p50 / p99 / p99.9 | ≤43 ns / 3.75 µs / 9.0 µs | 584 ns / 3.4 µs / 5.9 µs |
 
-A decision is one call to find the legal moves, choose one, and apply it. Dice rolls, card draws, and steals count as decisions too. Random play gives long games (about 340 turns); greedy play gives realistic ones (about 78 turns, p99 546 µs per game). Replays are deterministic and do not depend on the number of threads. The Mac clock ticks every 41 ns, which limits latency precision.
+A decision is one call to find the legal moves, choose one, and apply it. Dice rolls, card draws, and steals count as decisions too. Random play gives long games (about 340 turns); greedy play gives realistic ones (about 78 turns, p99 546 µs per game). Replays are deterministic and do not depend on the number of threads. My Mac clock ticks every 41 ns, which _limits latency precision_.
 
 ## Getting started
 
@@ -52,11 +52,9 @@ selfplay  plays many games in parallel, writes training data
 search    look-ahead search (evaluation only)
 ```
 
-C++ handles the game, inference, and data generation; Python only trains the model.
-
 ## What's left
 
-The game engine, hidden-card tracking, and baselines are done. Next is turning the game state into network input, adding Python bindings, and building the PPO trainer, then the fast C++ self-play and inference pipeline.
+The game engine, hidden-card tracking, and baselines are done. TODO: turn the game state into network input, add Python bindings, build the PPO trainer, then build the C++ self-play and inference pipeline.
 
 ## Docs
 
