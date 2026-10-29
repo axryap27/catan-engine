@@ -1,0 +1,5 @@
+add_library(catan_encode src/encode.cpp)
+target_include_directories(catan_encode PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(catan_encode PUBLIC catan::belief)
+target_compile_options(catan_encode PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_library(catan::encode ALIAS catan_encode)

@@ -1,5 +1,6 @@
 // Benchmarks the engine by playing whole games.
 //   catan_bench [games] [first_seed] [--policy random|greedy] [--threads N] [--sweep] [--latency]
+//               [--encode]
 //
 // Defaults: 2000 games from seed 1, random play, one thread. The checksum (xor of final state
 // hashes) changes only when play changes, and does not depend on the thread count.
@@ -9,6 +10,13 @@
 //                    throughput and scaling
 //   --latency        time every decision (next_decision + choice + apply) and print
 //                    percentiles. Timer cost is subtracted from samples but not from totals.
+//   --encode         also keep a belief per game (observe after every apply) and, at every
+//                    player decision, encode the deciding seat's observation and the legal-move
+//                    mask before it chooses. The state checksum is unchanged; the encoded bytes
+//                    feed a separate "encode sink" so the work cannot be optimized away. With
+//                    --latency the player row includes this work and an "encode" row times the
+//                    two encode calls alone. Compare wall time with and without the flag to get
+//                    the per-decision cost of encoding plus belief tracking.
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -21,7 +29,9 @@
 #include <vector>
 
 #include "catan/board.h"
+#include "catan/belief.h"
 #include "catan/chance.h"
+#include "catan/encode.h"
 #include "catan/policy.h"
 #include "catan/rng.h"
 #include "catan/rules.h"
@@ -118,6 +128,7 @@ struct Options {
     int threads = 1;
     bool sweep = false;
     bool latency = false;
+    bool encode = false;
 };
 
 struct Run {
@@ -126,8 +137,9 @@ struct Run {
     uint64_t player_decisions = 0;
     uint64_t turns = 0;
     int capped = 0;
+    uint64_t encode_sink = 0;  // bytes of encoded output, summed; filled only with --encode
     vector<int64_t> game_ns;
-    Histogram player, chance;  // filled only with --latency
+    Histogram player, chance, encode;  // filled only with --latency (encode: also --encode)
 
     void merge(const Run& o) {
         checksum ^= o.checksum;
@@ -135,18 +147,24 @@ struct Run {
         player_decisions += o.player_decisions;
         turns += o.turns;
         capped += o.capped;
+        encode_sink += o.encode_sink;
         game_ns.insert(game_ns.end(), o.game_ns.begin(), o.game_ns.end());
         player.merge(o.player);
         chance.merge(o.chance);
+        encode.merge(o.encode);
     }
 };
 
 // seats == nullptr plays the bench's own random policy, kept so checksums stay comparable
-// with earlier versions of this tool.
+// with earlier versions of this tool. With `encoding`, a belief follows the game and every
+// player decision is encoded before the move is chosen; play itself is unaffected.
 template <bool kTimed>
-void play_one(uint64_t seed, Policy* const* seats, int64_t overhead, Run& r) {
+void play_one(uint64_t seed, Policy* const* seats, bool encoding, int64_t overhead, Run& r) {
     const Board board = random_board(seed);
     GameState s = initial_state(board);
+    BeliefState belief = initial_belief();
+    Observation obs;
+    MaskBuffer mask;
     uint64_t moves = 0;
 
     const auto game_start = Clock::now();
@@ -158,14 +176,27 @@ void play_one(uint64_t seed, Policy* const* seats, int64_t overhead, Run& r) {
         if (d.kind == DecisionKind::TERMINAL) break;
         const bool chance = d.kind == DecisionKind::CHANCE;
         if (chance) {
-            apply_chance(board, s, sample_chance(d.chance, s, seed));
-        } else if (seats) {
-            apply(board, s,
-                  seats[d.player]->choose(board, s, d,
-                                          random_u64(seed, 100 + d.player, s.pub.ply)));
+            const EventList events = apply_chance(board, s, sample_chance(d.chance, s, seed));
+            if (encoding) observe(belief, s.pub, events);
         } else {
-            const auto n = random_below(seed, 1000, moves++, d.n_legal);
-            apply(board, s, nth_legal(d.mask, d.phase, static_cast<int>(n)));
+            if (encoding) {
+                Clock::time_point e0;
+                if constexpr (kTimed) e0 = Clock::now();
+                encode(board, s, belief, d.player, obs);
+                encode_mask(d, mask);
+                if constexpr (kTimed) r.encode.add(nanos_between(e0, Clock::now()) - overhead);
+                r.encode_sink += obs[s.pub.ply % OBS_SIZE] + mask[s.pub.ply % MASK_SIZE];
+            }
+            Action action;
+            if (seats) {
+                action = seats[d.player]->choose(board, s, d,
+                                                 random_u64(seed, 100 + d.player, s.pub.ply));
+            } else {
+                const auto n = random_below(seed, 1000, moves++, d.n_legal);
+                action = nth_legal(d.mask, d.phase, static_cast<int>(n));
+            }
+            const EventList events = apply(board, s, action);
+            if (encoding) observe(belief, s.pub, events);
         }
 
         if constexpr (kTimed) (chance ? r.chance : r.player).add(
@@ -199,8 +230,9 @@ pair<Run, double> run_games(const Options& o, int threads, int64_t overhead) {
         r.game_ns.reserve(o.games / threads + 1);
         for (int g; (g = next.fetch_add(1, memory_order_relaxed)) < o.games;) {
             const uint64_t seed = o.first_seed + static_cast<uint64_t>(g);
-            if (o.latency) play_one<true>(seed, o.greedy ? seats : nullptr, overhead, r);
-            else play_one<false>(seed, o.greedy ? seats : nullptr, overhead, r);
+            Policy* const* played = o.greedy ? seats : nullptr;
+            if (o.latency) play_one<true>(seed, played, o.encode, overhead, r);
+            else play_one<false>(seed, played, o.encode, overhead, r);
         }
     };
 
@@ -236,7 +268,7 @@ void print_latency_row(const char* label, Histogram& h) {
 int usage() {
     fprintf(stderr,
             "usage: catan_bench [games] [first_seed] [--policy random|greedy] [--threads N] "
-            "[--sweep] [--latency]\n");
+            "[--sweep] [--latency] [--encode]\n");
     return 2;
 }
 
@@ -256,6 +288,8 @@ int main(int argc, char** argv) {
             o.sweep = true;
         } else if (!strcmp(argv[i], "--latency")) {
             o.latency = true;
+        } else if (!strcmp(argv[i], "--encode")) {
+            o.encode = true;
         } else if (argv[i][0] != '-' && positional == 0) {
             o.games = atoi(argv[i]);
             ++positional;
@@ -277,20 +311,22 @@ int main(int argc, char** argv) {
         for (int t = 1; t < hw; t *= 2) counts.push_back(t);
         counts.push_back(hw);
 
-        printf("policy %s, %d games from seed %llu, %d hardware threads\n", policy, o.games,
+        printf("policy %s%s, %d games from seed %llu, %d hardware threads\n", policy,
+               o.encode ? " with encode" : "", o.games,
                static_cast<unsigned long long>(o.first_seed), hw);
         printf("  threads   wall s   M decisions/s   games/s   speedup   efficiency\n");
         double base = 0;
-        uint64_t checksum = 0;
+        uint64_t checksum = 0, sink = 0;
         bool same = true;
         for (const int t : counts) {
             auto [r, wall] = run_games(o, t, 0);
             const double rate = static_cast<double>(r.decisions) / wall;
-            if (t == 1) base = rate, checksum = r.checksum;
-            same = same && r.checksum == checksum;
+            if (t == 1) base = rate, checksum = r.checksum, sink = r.encode_sink;
+            same = same && r.checksum == checksum && r.encode_sink == sink;
             printf("  %7d %8.3f %15.2f %9.0f %8.2fx %11.0f%%\n", t, wall, rate / 1e6,
                    o.games / wall, rate / base, 100.0 * rate / base / t);
         }
+        if (o.encode) printf("encode sink %llu\n", static_cast<unsigned long long>(sink));
         printf("checksum 0x%016llx %s\n", static_cast<unsigned long long>(checksum),
                same ? "(identical at every thread count)" : "MISMATCH across thread counts");
         return same ? 0 : 1;
@@ -309,8 +345,9 @@ int main(int argc, char** argv) {
     auto [r, wall] = run_games(o, o.threads, clock.overhead);
 
     //printed statements vibecoded:
-    printf("policy %s, %d thread%s, %d games from seed %llu\n", policy, o.threads,
-           o.threads == 1 ? "" : "s", o.games, static_cast<unsigned long long>(o.first_seed));
+    printf("policy %s%s, %d thread%s, %d games from seed %llu\n", policy,
+           o.encode ? " with encode" : "", o.threads, o.threads == 1 ? "" : "s", o.games,
+           static_cast<unsigned long long>(o.first_seed));
     printf("decisions %llu (player %llu), turns %llu, %.1f turns/game, capped %d\n",
            static_cast<unsigned long long>(r.decisions),
            static_cast<unsigned long long>(r.player_decisions),
@@ -338,6 +375,12 @@ int main(int argc, char** argv) {
         print_latency_row("player", r.player);
         print_latency_row("chance", r.chance);
         print_latency_row("all", all);
+        if (o.encode) print_latency_row("encode", r.encode);  // inside "player", not in "all"
+    }
+
+    if (o.encode) {
+        printf("encode: %d-byte observation + %d-byte mask per player decision, sink %llu\n",
+               OBS_SIZE, MASK_SIZE, static_cast<unsigned long long>(r.encode_sink));
     }
 
     printf("checksum 0x%016llx\n", static_cast<unsigned long long>(r.checksum));

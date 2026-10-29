@@ -60,7 +60,7 @@ struct PublicState {
     uint8_t robber_hex;
     uint8_t current_player;
     Phase phase;
-    uint8_t setup_step;           // 0..15, snake order
+    uint8_t setup_step;           // 0..15 during setup (snake order), 16 after
     uint8_t dice;
     uint8_t longest_road_holder;  // NONE if unclaimed
     uint8_t largest_army_holder;  // NONE if unclaimed

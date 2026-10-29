@@ -12,6 +12,7 @@ option(CATAN_BUILD_TESTS "Build unit tests" ON)
 
 add_subdirectory(core)
 add_subdirectory(belief)
+add_subdirectory(encode)
 add_subdirectory(eval)
 add_subdirectory(tools)
 
@@ -19,5 +20,6 @@ if(CATAN_BUILD_TESTS)
     enable_testing()
     add_subdirectory(core/tests)
     add_subdirectory(belief/tests)  # reuses Catch2 and catan_test_support from core/tests
+    add_subdirectory(encode/tests)
     add_subdirectory(eval/tests)
 endif()
