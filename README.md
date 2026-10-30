@@ -25,7 +25,7 @@ Requires CMake 3.24+, Ninja, and a C++20 compiler (Clang or GCC 14). On Apple Si
 ```bash
 cmake --preset release && cmake --build --preset release
 
-build/release/tools/catan_sim 42                        # play one random game, print every event
+build/release/tools/catan_sim 42 --board                # play one random game, print events + final board
 build/release/tools/catan_match greedy random 250       # match over 250 seeds, win rates with 95% CIs
 build/release/tools/catan_bench 50000 --sweep           # throughput and scaling across threads
 build/release/tools/catan_bench 20000 --policy greedy --latency   # per-decision latency percentiles
@@ -39,6 +39,26 @@ cmake --preset debug && cmake --build --preset debug && ctest --preset debug
 cmake --preset asan && cmake --build --preset asan && ctest --preset asan   # sanitizers + invariant checks
 ```
 
+Python bindings and playing in the terminal (numpy + pytest in a local venv; the `python` preset uses `.venv`):
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+cmake --preset python && cmake --build --preset python && ctest --preset python
+PYTHONPATH=build/python/bind .venv/bin/python bind/python/play.py --seed 7   # you vs 3 greedy bots
+```
+
+```python
+import catan_engine as ce
+g = ce.Game(seed=1)
+g.legal_actions()            # [(type, arg), ...]
+g.step(*g.greedy_action())   # events
+g.observation(), g.mask()    # uint8 network input for the player to move
+print(g.render(observer=0))  # ASCII board + what seat 0 can see
+envs = ce.VecGames(256)      # batched games for training: observe() / step(types, args)
+```
+
+The API is documented in `bind/python/catan_engine.pyi`.
+
 CI runs the tests with GCC and Clang on Linux and macOS, under ASan/UBSan, plus a 10,000-game fuzz that cross-checks every legal move against an independent reference implementation.
 
 ## Architecture
@@ -48,7 +68,7 @@ core      rules, game state, legal moves                       done
 belief    what each player knows about hidden cards             done
 eval      baselines (random, greedy) and paired-seed matches    done
 encode    game state -> neural network input                    done
-bind      Python bindings and a text view of the board
+bind      Python bindings and a text view of the board           done
 infer     runs the trained model from C++
 selfplay  plays many games in parallel, writes training data
 search    look-ahead search (evaluation only)
@@ -56,7 +76,7 @@ search    look-ahead search (evaluation only)
 
 ## What's left
 
-The game engine, hidden-card tracking, baselines, and the network's input encoding are done. TODO: add Python bindings, build the PPO trainer, then build the C++ self-play and inference pipeline.
+The game engine, hidden-card tracking, baselines, the network's input encoding, and the Python bindings are done. TODO: build the network and PPO trainer, then the C++ self-play and inference pipeline.
 
 ## Docs
 

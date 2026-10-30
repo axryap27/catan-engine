@@ -1,61 +1,53 @@
 // Plays one game with uniformly random legal moves and prints the event log.
-//   catan_sim [seed] [--quiet]
+//   catan_sim [seed] [--quiet] [--board] [--ids] [--watch]
+//     --quiet   print only the final summary line
+//     --board   after the game, print the final position (god view: every hand and dev card)
+//     --ids     label empty corners and edges with their vertex and edge ids in every board
+//               printed by --board and --watch
+//     --watch   print the position after every turn
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "catan/board.h"
 #include "catan/chance.h"
 #include "catan/rng.h"
 #include "catan/rules.h"
+#include "catan/text.h"
 
 using namespace std;
 using namespace catan;
 
 namespace {
 
-const char* const RES[] = {"brick", "lumber", "wool", "grain", "ore"};
-const char* const DEV[] = {"knight", "victory point", "road building", "year of plenty",
-                           "monopoly"};
-
+// Dice rolls, turn ends and the end of the game stand out; everything else is indented
+// under the roll that caused it.
 void print(const Event& e) {
-    const int p = e.player;
-    switch (e.type) {
-        case EventType::SETTLEMENT_BUILT: printf("  P%d builds a settlement at v%d\n", p, e.a); break;
-        case EventType::CITY_BUILT: printf("  P%d builds a city at v%d\n", p, e.a); break;
-        case EventType::ROAD_BUILT: printf("  P%d builds a road at e%d\n", p, e.a); break;
-        case EventType::GAIN: printf("  P%d +%d %s\n", p, e.b, RES[e.a]); break;
-        case EventType::SPEND: printf("  P%d -%d %s\n", p, e.b, RES[e.a]); break;
-        case EventType::DISCARD: printf("  P%d discards %s\n", p, RES[e.a]); break;
-        case EventType::DICE_ROLLED: printf("P%d rolls %d\n", p, e.a); break;
-        case EventType::ROBBER_MOVED: printf("  P%d moves the robber to hex %d\n", p, e.a); break;
-        case EventType::STEAL: printf("  P%d steals %s from P%d\n", p, RES[e.a], e.target); break;
-        case EventType::DEV_BOUGHT: printf("  P%d buys a %s card\n", p, DEV[e.a]); break;
-        case EventType::DEV_PLAYED: printf("  P%d plays %s\n", p, DEV[e.a]); break;
-        case EventType::MONOPOLY:
-            if (e.b > 0) printf("  P%d takes %d %s from P%d\n", p, e.b, RES[e.a], e.target);
-            break;
-        case EventType::LONGEST_ROAD:
-            if (p == NONE) printf("  Longest Road is now unclaimed\n");
-            else printf("  P%d takes Longest Road\n", p);
-            break;
-        case EventType::LARGEST_ARMY: printf("  P%d takes Largest Army\n", p); break;
-        case EventType::GAME_OVER:
-            if (e.player == NONE) printf("Game over: turn cap reached\n");
-            else printf("Game over: P%d wins\n", p);
-            break;
-        default: break;
-    }
+    const bool top = e.type == EventType::DICE_ROLLED || e.type == EventType::TURN_ENDED ||
+                     e.type == EventType::GAME_OVER;
+    printf("%s%s\n", top ? "" : "  ", describe_event(e).c_str());
+}
+
+void usage() {
+    fprintf(stderr, "usage: catan_sim [seed] [--quiet] [--board] [--ids] [--watch]\n");
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
     uint64_t seed = 1;
-    bool quiet = false;
+    bool quiet = false, show_board = false, watch = false;
+    RenderOptions render;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--quiet") == 0) quiet = true;
-        else seed = strtoull(argv[i], nullptr, 10);
+        else if (strcmp(argv[i], "--board") == 0) show_board = true;
+        else if (strcmp(argv[i], "--watch") == 0) watch = true;
+        else if (strcmp(argv[i], "--ids") == 0) render.vertex_ids = render.edge_ids = true;
+        else if (strncmp(argv[i], "--", 2) == 0) {
+            usage();
+            return 2;
+        } else seed = strtoull(argv[i], nullptr, 10);
     }
 
     const Board board = random_board(seed);
@@ -71,8 +63,11 @@ int main(int argc, char** argv) {
             const auto n = random_below(seed, 1000, moves++, d.n_legal);
             events = apply(board, s, nth_legal(d.mask, d.phase, static_cast<int>(n)));
         }
-        if (!quiet) {
-            for (const Event& e : events) print(e);
+        for (const Event& e : events) {
+            if (!quiet) print(e);
+            if (watch && e.type == EventType::TURN_ENDED) {
+                printf("%s\n\n", render_state(board, s, NONE, render).c_str());
+            }
         }
     }
 
@@ -80,5 +75,6 @@ int main(int argc, char** argv) {
            s.pub.turn, s.pub.ply);
     for (int p = 0; p < NUM_PLAYERS; ++p) printf(" P%d=%d", p, s.pub.public_vp[p]);
     printf("\n");
+    if (show_board) printf("\n%s\n", render_state(board, s, NONE, render).c_str());
     return 0;
 }

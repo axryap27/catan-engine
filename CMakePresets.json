@@ -35,6 +35,16 @@
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
         "CATAN_CHECKED": "ON"
       }
+    },
+    {
+      "name": "python",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CATAN_BUILD_PYTHON": "ON",
+        "Python3_EXECUTABLE": "${sourceDir}/.venv/bin/python"
+      }
     }
   ],
   "buildPresets": [
@@ -53,6 +63,10 @@
     {
       "name": "asan",
       "configurePreset": "asan"
+    },
+    {
+      "name": "python",
+      "configurePreset": "python"
     }
   ],
   "testPresets": [
@@ -80,6 +94,13 @@
     {
       "name": "asan",
       "configurePreset": "asan",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "python",
+      "configurePreset": "python",
       "output": {
         "outputOnFailure": true
       }

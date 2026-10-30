@@ -51,3 +51,36 @@ jobs:
         env:
           CATAN_FUZZ_GAMES: "10000"
         run: build/checked/core/tests/test_fuzz
+
+  # The Python module and its pytest suite (numpy and pytest live in the repo's .venv, which the
+  # `python` preset points CMake at).
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, cxx: g++-14 }
+          - { os: macos-15, cxx: clang++ }
+    runs-on: ${{ matrix.os }}
+    name: python / ${{ matrix.os }} / ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create venv
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements-dev.txt
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+      - name: Configure
+        run: cmake --preset python -DCMAKE_CXX_COMPILER=${{ matrix.cxx }}
+      - name: Build
+        run: cmake --build --preset python
+      - name: Test
+        run: ctest --preset python --output-on-failure
