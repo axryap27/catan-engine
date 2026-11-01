@@ -1,6 +1,7 @@
 build/
 cmake-build-*/
 __pycache__/
+.pytest_cache/
 *.so
 *.pyc
 .venv/
