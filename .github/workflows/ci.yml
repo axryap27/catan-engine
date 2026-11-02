@@ -84,3 +84,12 @@ jobs:
         run: cmake --build --preset python
       - name: Test
         run: ctest --preset python --output-on-failure
+      # The trainer (train/) needs PyTorch; the CPU-only wheel keeps the Linux download small.
+      - name: Install PyTorch (Linux)
+        if: runner.os == 'Linux'
+        run: .venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install PyTorch (macOS)
+        if: runner.os == 'macOS'
+        run: .venv/bin/python -m pip install torch
+      - name: Test trainer
+        run: .venv/bin/python -m pytest train/tests -q -p no:cacheprovider

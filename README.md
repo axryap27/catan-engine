@@ -59,6 +59,13 @@ envs = ce.VecGames(256)      # batched games for training: observe() / step(type
 
 The API is documented in `bind/python/catan_engine.pyi`.
 
+The trainer (`train/catan_rl/`, PyTorch): the policy network, its masked move distribution, and win-rate matches.
+
+```bash
+.venv/bin/pip install -r train/requirements.txt
+.venv/bin/python -m pytest train/tests -q
+```
+
 CI runs the tests with GCC and Clang on Linux and macOS, under ASan/UBSan, plus a 10,000-game fuzz that cross-checks every legal move against an independent reference implementation.
 
 ## Architecture
@@ -69,6 +76,7 @@ belief    what each player knows about hidden cards             done
 eval      baselines (random, greedy) and paired-seed matches    done
 encode    game state -> neural network input                    done
 bind      Python bindings and a text view of the board           done
+train     PPO trainer: policy network and evaluation (Python)    in progress
 infer     runs the trained model from C++
 selfplay  plays many games in parallel, writes training data
 search    look-ahead search (evaluation only)
@@ -76,7 +84,7 @@ search    look-ahead search (evaluation only)
 
 ## What's left
 
-The game engine, hidden-card tracking, baselines, the network's input encoding, and the Python bindings are done. TODO: build the network and PPO trainer, then the C++ self-play and inference pipeline.
+The game engine, hidden-card tracking, baselines, the network's input encoding, the Python bindings, and the policy network are done. TODO: train it with PPO (REINFORCE first, then a value head, GAE, PPO, self-play), then the C++ self-play and inference pipeline.
 
 ## Docs
 
