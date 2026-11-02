@@ -14,3 +14,5 @@ data/
 compile_commands.json
 STATUS.md
 notes/
+# Learning material (primer, exercises, demos): local only
+train/learn/
