@@ -1,30 +1,12 @@
 """Measuring an agent: the random bot, and matches against random, greedy or itself."""
 
 import math
-import time
 from dataclasses import dataclass
 
-import numpy as np
 import torch
 
-from catan_rl import actions
-from catan_rl.engine import ce
 from catan_rl.policy import Agent
-
-
-def random_actions(obs: np.ndarray, mask: np.ndarray,
-                   generator: torch.Generator | None = None) -> tuple[np.ndarray, np.ndarray]:
-    """The random bot: a uniformly random legal type, then a uniformly random legal argument
-    (actions.sample with all-zero logits). Arrays as for Agent.act; returns (types, args) int64.
-
-    The C++ random policy (eval/) is uniform over all legal moves instead, so it ends its turn
-    far less often; the two are different baselines."""
-    # All-zero logits give every legal type the same probability, and then every legal argument
-    # the same probability: exactly the random bot, with no network needed.
-    logits = torch.zeros(len(obs), ce.MASK_SIZE)
-    types, args, _ = actions.sample(
-        logits, torch.as_tensor(mask), actions.phase_of(torch.as_tensor(obs)), generator)
-    return types.numpy(), args.numpy()
+from catan_rl.rollout import play, random_actions  # noqa: F401  (random_actions: re-exported)
 
 
 def wilson(wins: int, games: int, z: float = 1.96) -> tuple[float, float]:
@@ -84,58 +66,9 @@ def play_match(agent: Agent, opponent: str = "random", games: int = 400, first_s
 
     `generator` drives the random bot (the agent has its own). The same arguments, agent and
     generator seeds give the same result. ValueError for an unknown opponent or games < 1."""
-    if opponent not in ("random", "greedy", "self"):
-        raise ValueError(f"unknown opponent {opponent!r}: use 'random', 'greedy' or 'self'")
-    if games < 1:
-        raise ValueError(f"games must be at least 1, got {games}")
-    start = time.perf_counter()
-
-    env = ce.VecGames(games, first_seed, standard_board)
-    seat = np.arange(games) % ce.NUM_PLAYERS    # the agent's seat in each slot
-    finished = np.zeros(games, dtype=bool)      # has the slot's first game ended?
-    wins = capped = turn_total = agent_decisions = 0
-
-    while not finished.all():
-        obs, mask, decider = env.observe()
-        types = np.zeros(games, dtype=np.int64)
-        args = np.zeros(games, dtype=np.int64)
-
-        # Who moves in each slot? The agent, whenever its seat is to act (in "self": every seat
-        # is the agent) -- but only in slots still being counted.
-        if opponent == "self":
-            agent_rows = ~finished
-        else:
-            agent_rows = ~finished & (decider == seat)
-        # A finished slot restarts as a fresh game that nobody scores; random play is the
-        # cheapest way to keep it running, since the loop steps all slots together.
-        random_rows = finished.copy()
-        if opponent == "random":
-            random_rows |= ~agent_rows
-        elif opponent == "greedy":
-            greedy_rows = ~agent_rows & ~finished
-            if greedy_rows.any():
-                greedy_types, greedy_args = env.greedy_actions()
-                types[greedy_rows] = greedy_types[greedy_rows]
-                args[greedy_rows] = greedy_args[greedy_rows]
-
-        if random_rows.any():
-            types[random_rows], args[random_rows] = random_actions(
-                obs[random_rows], mask[random_rows], generator)
-        if agent_rows.any():
-            types[agent_rows], args[agent_rows], _ = agent.act(obs[agent_rows], mask[agent_rows])
-            agent_decisions += int(agent_rows.sum())
-
-        done, winner, _, turns = env.step(types, args)
-
-        # Only a slot's FIRST game counts. If every finished game counted, slots whose games
-        # happen to be short would finish (and restart, and finish again) more often and so
-        # be over-represented, which biases both the win rate and the game length.
-        newly = done & ~finished
-        wins += int((winner[newly] == seat[newly]).sum())
-        capped += int((winner[newly] == -1).sum())  # the turn cap ended it: nobody won
-        turn_total += int(turns[newly].astype(np.int64).sum())
-        finished |= newly
-
-    return MatchResult(opponent=opponent, games=games, wins=wins, capped=capped,
-                       mean_turns=turn_total / games, agent_decisions=agent_decisions,
-                       seconds=time.perf_counter() - start)
+    # The game loop lives in rollout.play (training records with it; here nothing is kept).
+    episodes = play(agent, opponent, games, first_seed, standard_board, generator, record=False)
+    return MatchResult(opponent=opponent, games=episodes.games, wins=int(episodes.won.sum()),
+                       capped=int(episodes.capped.sum()),
+                       mean_turns=int(episodes.turns.sum()) / episodes.games,
+                       agent_decisions=episodes.decisions, seconds=episodes.seconds)
