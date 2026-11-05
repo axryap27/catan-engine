@@ -10,6 +10,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
+def pytest_configure(config):
+    # The tags stage3_steps.step(n) puts on each stage 3 step's tests: `-m step1` selects them.
+    for n in (1, 2, 3):
+        config.addinivalue_line("markers", f"step{n}: the tests of stage 3, step {n}")
+
+
 @dataclass(frozen=True)
 class Positions:
     """Real decision points from random-play games, stacked for batched calls.

@@ -35,9 +35,14 @@ class PolicyNet(nn.Module):
         nn.init.orthogonal_(self.head.weight, gain=0.01)
         nn.init.zeros_(self.head.bias)
 
+    def features(self, obs: torch.Tensor) -> torch.Tensor:
+        """obs (B, OBS_SIZE), uint8 or float, on the net's device -> the body's output (B, hidden):
+        what the head turns into logits (and, in stage 3, what a value head can read too)."""
+        return self.body(torch.log1p(obs.float()))
+
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """obs: uint8 or float, on the net's device."""
-        return self.head(self.body(torch.log1p(obs.float())))
+        return self.head(self.features(obs))
 
 
 class Agent:

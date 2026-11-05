@@ -1,5 +1,7 @@
-"""Tests for catan_rl.reinforce (rewards, advantages, the gradient, Trainer) and the
-train/reinforce.py CLI, written from the contracts."""
+"""Tests for catan_rl.reinforce (rewards, advantages, the gradient, Trainer), written from the
+contracts. The Trainer tests here also cover the loop it shares with every algorithm
+(trainer.Trainer: resuming, evaluation, checkpoints); test_trainer.py tests the rest of that
+module and test_train_cli.py the train/train.py CLI."""
 
 import copy
 import dataclasses
@@ -7,8 +9,6 @@ import inspect
 import json
 import os
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,16 +16,16 @@ import numpy as np
 import pytest
 import torch
 
-from catan_rl import actions, reinforce
+from catan_rl import actions
+from catan_rl import trainer as base
 from catan_rl.engine import ce
 from catan_rl.evaluate import MatchResult, play_match, wilson
 from catan_rl.policy import Agent, PolicyNet
-from catan_rl.reinforce import (Config, Trainer, accumulate_gradients, config_from_dict,
-                                game_rewards, move_advantages)
+from catan_rl.reinforce import Config, Trainer, accumulate_gradients, move_advantages
 from catan_rl.rollout import Episodes, play
+from catan_rl.trainer import game_rewards
 
 AT = ce.ActionType
-CLI = Path(__file__).resolve().parents[1] / "reinforce.py"
 
 STEP_KEYS = {"update", "games", "moves", "win_rate", "mean_vp", "mean_turns", "capped", "reward",
              "loss", "log_prob", "entropy", "grad_norm", "rollout_seconds", "update_seconds"}
@@ -126,7 +126,7 @@ def recorded():
     return SimpleNamespace(net=net, ep=ep)
 
 
-# ---- game_rewards -------------------------------------------------------------------------------
+# ---- game_rewards (trainer.py, shared by every algorithm) ---------------------------------------
 
 def test_game_rewards_win():
     ep = make_episodes(won=[True, False, False, True, False], vp=[10, 9, 3, 12, 0],
@@ -354,16 +354,16 @@ def test_training_on_fixed_episodes_favours_the_rewarded_type(recorded, position
 def test_config_from_dict_round_trips():
     for c in (Config(), Config(updates=7, lr=3e-4, reward="vp", baseline="none",
                                entropy_coef=0.01, opponent="greedy", seed=4, hidden=64)):
-        assert config_from_dict(dataclasses.asdict(c)) == c
+        assert Trainer.config_from_dict(dataclasses.asdict(c)) == c
         # As stored in JSON, too.
-        assert config_from_dict(json.loads(json.dumps(dataclasses.asdict(c)))) == c
+        assert Trainer.config_from_dict(json.loads(json.dumps(dataclasses.asdict(c)))) == c
 
 
 def test_config_from_dict_rejects_unknown_keys():
     d = dataclasses.asdict(Config())
     d["learning_rate"] = 0.1
     with pytest.raises(ValueError):
-        config_from_dict(d)
+        Trainer.config_from_dict(d)
 
 
 # ---- Trainer ----------------------------------------------------------------------------------
@@ -605,7 +605,7 @@ def test_invalid_config_rejected(tmp_path, changes):
 
 @pytest.fixture
 def play_calls(monkeypatch):
-    """Spies on the play() the reinforce module calls: [(bound arguments, Episodes)]."""
+    """Spies on the play() the training loop (trainer.py) calls: [(bound arguments, Episodes)]."""
     calls = []
     signature = inspect.signature(play)
 
@@ -616,7 +616,7 @@ def play_calls(monkeypatch):
         calls.append((dict(bound.arguments), ep))
         return ep
 
-    monkeypatch.setattr(reinforce, "play", spy)
+    monkeypatch.setattr(base, "play", spy)
     return calls
 
 
@@ -701,7 +701,7 @@ def test_evaluate(tmp_path, monkeypatch):
         seen.append(dict(bound.arguments))
         return play_match(*args, **kwargs)
 
-    monkeypatch.setattr(reinforce, "play_match", spy)
+    monkeypatch.setattr(base, "play_match", spy)
     a = Trainer(TINY, new_dir(tmp_path, "a"))
     b = Trainer(TINY, new_dir(tmp_path, "b"))
     a1, b1 = a.step(), b.step()
@@ -760,50 +760,3 @@ def test_save_is_atomic(tmp_path, monkeypatch):
     monkeypatch.undo()
     assert (tmp_path / "checkpoint.pt").read_bytes() == good
     assert Trainer(TINY, tmp_path).update == 0
-
-
-# ---- the CLI -------------------------------------------------------------------------------------
-
-def cli(*args: str, cwd: Path) -> subprocess.CompletedProcess:
-    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    return subprocess.run([sys.executable, str(CLI), *args], cwd=cwd, env=env,
-                          capture_output=True, text=True, timeout=300)
-
-
-CLI_ARGS = ["--updates", "1", "--games-per-update", "4", "--eval-games", "4", "--hidden", "16",
-            "--opponent", "greedy"]
-CLI_CONFIG = Config(updates=1, games_per_update=4, eval_games=4, hidden=16, opponent="greedy")
-
-
-def test_cli_help(tmp_path):
-    r = cli("--help", cwd=tmp_path)
-    assert r.returncode == 0, r.stderr
-    for f in dataclasses.fields(Config):
-        assert "--" + f.name.replace("_", "-") in r.stdout, f.name
-    assert "--run" in r.stdout and "--device" in r.stdout
-
-
-def test_cli_trains(tmp_path):
-    run_dir = tmp_path / "runs" / "reinforce"
-    r = cli("--run", str(run_dir), *CLI_ARGS, cwd=tmp_path)
-    assert r.returncode == 0, r.stderr
-    assert (run_dir / "checkpoint.pt").is_file()
-    lines = read_metrics(run_dir)
-    assert [x["update"] for x in lines] == [0, 1]
-    assert lines[1]["games"] == 4 and lines[1]["eval_games"] == 4
-    # Every other field took the dataclass default: the checkpoint resumes under CLI_CONFIG.
-    trainer = Trainer(CLI_CONFIG, run_dir)
-    assert trainer.update == 1 and trainer.config == CLI_CONFIG
-
-
-def test_cli_config_mismatch_is_one_line_and_status_2(tmp_path):
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-    Trainer(CLI_CONFIG, run_dir).save()
-    before = (run_dir / "checkpoint.pt").read_bytes()
-    r = cli("--run", str(run_dir), *CLI_ARGS, "--lr", "0.01", cwd=tmp_path)
-    assert r.returncode == 2, (r.stdout, r.stderr)
-    err = r.stderr.strip()
-    assert err and "\n" not in err, r.stderr
-    assert "Traceback" not in r.stderr and "lr" in err
-    assert (run_dir / "checkpoint.pt").read_bytes() == before
