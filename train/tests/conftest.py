@@ -11,9 +11,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 def pytest_configure(config):
-    # The tags stage3_steps.step(n) puts on each stage 3 step's tests: `-m step1` selects them.
-    for n in (1, 2, 3):
-        config.addinivalue_line("markers", f"step{n}: the tests of stage 3, step {n}")
+    # The tags lab_steps' STAGEn.step(k) puts on each lab step's tests: `-m stage4_step1`
+    # selects them.
+    from lab_steps import STAGES
+    for stage in STAGES:
+        for k, name in stage.names.items():
+            config.addinivalue_line(
+                "markers", f"{stage.tag(k)}: the tests of stage {stage.number}, step {k} ({name})")
 
 
 @dataclass(frozen=True)

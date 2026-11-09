@@ -3,6 +3,7 @@
     .venv/bin/python train/train.py reinforce --run runs/reinforce               # stage 2
     .venv/bin/python train/train.py actor-critic --run runs/ac                   # stage 3
     .venv/bin/python train/train.py actor-critic --run runs/ac --updates 400     # resume, go on
+    .venv/bin/python train/train.py gae --run runs/gae                           # stage 4
 
 Rerunning with the same --run resumes from its checkpoint, with the run's own settings: flags
 you leave out keep them, and a flag that changes one (other than --updates) is an error. Every
@@ -14,11 +15,12 @@ import argparse
 import dataclasses
 import sys
 
-from catan_rl import actor_critic, reinforce, trainer
+from catan_rl import actor_critic, gae, reinforce, trainer
 
 ALGORITHMS: dict[str, type[trainer.Trainer]] = {
     "reinforce": reinforce.Trainer,
     "actor-critic": actor_critic.Trainer,
+    "gae": gae.Trainer,
 }
 CHOICES = {"reward": trainer.REWARDS, "baseline": reinforce.BASELINES,
            "opponent": trainer.OPPONENTS}
@@ -40,6 +42,7 @@ HELP = {
     "baseline": "subtract the batch's mean reward from every move's reward, or nothing",
     "gamma": "discount per agent move (1: every move's return is its game's reward)",
     "value_coef": "weight of the critic's loss",
+    "gae_lambda": "GAE's lambda: 1 scores a move by the rest of its game, 0 by its TD error",
 }
 
 
@@ -47,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     algorithms = parser.add_subparsers(dest="algorithm", required=True, metavar="ALGORITHM",
-                                       help=" or ".join(ALGORITHMS))
+                                       help=", ".join(ALGORITHMS))
     for name, trainer_type in ALGORITHMS.items():
         about = sys.modules[trainer_type.__module__].__doc__  # "Stage N: ...", then the details
         sub = algorithms.add_parser(name, help=about.splitlines()[0], description=about,
