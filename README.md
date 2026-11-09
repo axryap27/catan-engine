@@ -67,7 +67,7 @@ The trainer (`train/catan_rl/`, PyTorch): the policy network, its masked move di
 .venv/bin/python train/train.py reinforce --run runs/reinforce --updates 100   # REINFORCE vs random bots
 ```
 
-REINFORCE against 3 random bots takes the agent from 26.5% to 80% wins in 100 updates (under 4 minutes on an M-series Mac). It still loses to the greedy bot.
+**RL progress.** Against 3 random bots, the untrained network wins 26.5% of games (chance is 25%), and REINFORCE takes it to 80% in 100 updates, in under 4 minutes on an M-series Mac. It hasn't won a game against the greedy bot yet (0 of 400). Next come actor-critic (a learned estimate of each position's chance of winning), then GAE, PPO and self-play.
 
 CI runs the tests with GCC and Clang on Linux and macOS, under ASan/UBSan, plus a 10,000-game fuzz that cross-checks every legal move against an independent reference implementation.
 
